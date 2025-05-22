@@ -1,16 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+import openai
+import os
 
-# Crear app Flask
 app = Flask(__name__)
-CORS(app)  # Habilita CORS para peticiones externas
+CORS(app)
 
-# Cargar el modelo generador de diálogo
-print("→ Cargando modelo generador (DialoGPT)...")
-tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
-model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-medium")
+# Configurar tu clave secreta de OpenAI (¡segura!)
+openai.api_key = "open-ai-api-key"
 
 @app.route("/responder", methods=["POST"])
 def responder():
@@ -19,21 +16,24 @@ def responder():
     if not data or "mensaje" not in data:
         return jsonify({"error": "Falta el campo 'mensaje'"}), 400
 
-    mensaje = data["mensaje"].strip()
+    mensaje = data["mensaje"]
 
-    if not mensaje:
-        return jsonify({"error": "El mensaje está vacío"}), 400
+    try:
+        respuesta = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # Puedes cambiar a "gpt-4" si tienes acceso
+            messages=[
+                {"role": "system", "content": "Actúa como un amigo empático que da consejos útiles según el contexto."},
+                {"role": "user", "content": mensaje}
+            ],
+            temperature=0.7,
+            max_tokens=200
+        )
 
-    # Tokenizar entrada del usuario
-    input_ids = tokenizer.encode(mensaje + tokenizer.eos_token, return_tensors="pt")
+        texto_respuesta = respuesta.choices[0].message["content"].strip()
+        return jsonify({"respuesta": texto_respuesta})
 
-    # Generar respuesta con el modelo
-    respuesta_ids = model.generate(input_ids, max_length=100, pad_token_id=tokenizer.eos_token_id)
-
-    # Decodificar respuesta generada
-    respuesta = tokenizer.decode(respuesta_ids[:, input_ids.shape[-1]:][0], skip_special_tokens=True)
-
-    return jsonify({"respuesta": respuesta})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
