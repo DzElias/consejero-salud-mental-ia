@@ -1,0 +1,5 @@
+1 - pip install flask-cors
+2 - pip install virtualenv
+3 - python -m venv venv 
+4 - pip install -r requirements.txt
+5 - python app.py
